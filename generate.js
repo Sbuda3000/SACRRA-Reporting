@@ -13,18 +13,12 @@ const {
   BRAND_NAME
 } = process.env;
 
-var records = [];
-var monthEnd = "";
-var today = "";
-
-// Format utility
 function pad(value, length, padChar = " ", align = "left") {
   const str = value?.toString() ?? "";
   if (align === "left") return str.padEnd(length, padChar).substring(0, length);
   return str.padStart(length, padChar).substring(0, length);
 }
 
-// Header line for Monthly file
 function buildHeader(monthEnd, creationDate) {
   return (
     "H" +
@@ -37,68 +31,6 @@ function buildHeader(monthEnd, creationDate) {
   );
 }
 
-function buildDataLine(r, recordType = "D") {
-  return (
-    pad(recordType, 1) +
-    pad(r.sa_id_number, 13, "0", "right") +
-    pad(r.non_sa_id_text || "", 16) +
-    pad(r.gender_text || "", 1) +
-    pad(r.dateofbirth_text || "", 8) +
-    pad(r.branchcode_text || "", 8) +
-    pad(r.accountnumber_number || "", 25) +
-    pad(r.subaccountnumber_text || "", 4) +
-    pad(r.surname_text || "", 25) +
-    pad(r.title_text || "", 5) +
-    pad(r.forename1_text || "", 14) +
-    pad(r.forename2_text || "", 14) +
-    pad(r.forename3_text || "", 14) +
-    pad(r.addressline1_text || "", 25) +
-    pad(r.addressline2_text || "", 25) +
-    pad(r.addressline3_text || "", 25) +
-    pad(r.addressline4_text || "", 25) +
-    pad(r.addresspostalcode_number || "", 6) +
-    pad(r.ownerortenant_text || "", 1) +
-    pad(r.postaladdressline1_text || "", 25) +
-    pad(r.postaladdressline2_text || "", 25) +
-    pad(r.postaladdressline3_text || "", 25) +
-    pad(r.postaladdressLine4_text || "", 25) +
-    pad(r.postalcode_number || "", 6) +
-    pad(r.ownershiptype_text || "", 2) +
-    pad(r.loanreasoncode_text || "", 2) +
-    pad(r.paymenttype_text || "", 2) +
-    pad("M", 2) +
-    pad(r.date_account_opened || "", 8) +
-    pad(r.deferred_payment_date || "00000000", 8) +
-    pad(r.last_payment_date || "00000000", 8) +
-    pad(r.openingbalance_number || "0", 9, "0", "right") +
-    pad(r.currentbalance_number || "0", 9, "0", "right") +
-    pad(r.currentbalanceindicator_number || "", 1) +
-    pad(r.arrearamount_number || "0", 9, "0", "right") +
-    pad(r.instalmentamount_number || "0", 9, "0", "right") +
-    pad(r.monthsinarrears_number || "00", 2, "0", "right") +
-    pad(r.statuscode_text || "", 2) +
-    pad(r.repaymentfrequency_text || "00", 2) +
-    pad(r.terms_text || "0000", 4) +
-    pad(r.statusdate_text || "00000000", 8) +
-    pad(r.oldsupplierbranchcode_text || "", 8) +
-    pad(r.oldaccountnumber_text || "", 25) +
-    pad(r.oldsubaccountnumber_text || "", 4) +
-    pad(r.oldsupplierreferencenumber_text || "", 10) +
-    pad(r.hometelephone_number || "", 16) +
-    pad(r.cellphonenumber_number || "", 16) +
-    pad(r.employerphone_number || "", 16) +
-    pad(r.employername_text || "", 60) +
-    pad(r.income_number || "0", 9, "0", "right") +
-    pad(r.incomefrequency_text || "", 1) +
-    pad(r.occupation_text || "", 20) +
-    pad(r.thirdpartyname_name || "", 60) +
-    pad(r.accountsoldtothirdparty_text || "00", 2) +
-    pad(r.numberofparticipantsinjointloan_number || "000", 3) +
-    pad("", 2)
-  );
-}
-
-// Trailer line for Monthly file
 function buildTrailer(count) {
   return "T" + pad(count, 9, "0", "right") + pad("", 690);
 }
@@ -133,33 +65,86 @@ function enrichFields(r) {
   return r;
 }
 
+function buildDataLine(r) {
+  return (
+    pad("D", 1) +
+    pad(r.sa_id, 13, "0", "right") +
+    pad(r.non_sa_id || "", 16) +
+    pad(r.gender || "", 1) +
+    pad(r.date_of_birth || "", 8) +
+    pad(r.branch_code || "", 8) +
+    pad(r.account_number || "", 25) +
+    pad(r.sub_account_number || "", 4) +
+    pad(r.surname || "", 25) +
+    pad(r.title || "", 5) +
+    pad(r.first_name || "", 14) +
+    pad(r.middle_name || "", 14) +
+    pad(r.third_name || "", 14) +
+    pad(r.res_address1 || "", 25) +
+    pad(r.res_address2 || "", 25) +
+    pad(r.res_address3 || "", 25) +
+    pad(r.res_address4 || "", 25) +
+    pad(r.res_postal_code || "", 6) +
+    pad(r.tenant_type || "", 1) +
+    pad(r.post_address1 || "", 25) +
+    pad(r.post_address2 || "", 25) +
+    pad(r.post_address3 || "", 25) +
+    pad(r.post_address4 || "", 25) +
+    pad(r.post_postal_code || "", 6) +
+    pad(r.ownership || "", 2) +
+    pad(r.loan_reason || "", 2) +
+    pad(r.payment_type || "", 2) +
+    pad("M", 2) +
+    pad(r.date_account_opened || "", 8) +
+    pad(r.deferred_payment_date || "00000000", 8) +
+    pad(r.last_payment_date || "00000000", 8) +
+    pad(r.opening_balance || "0", 9, "0", "right") +
+    pad(r.current_balance || "0", 9, "0", "right") +
+    pad(r.current_balance_indicator || "", 1) +
+    pad(r.amount_overdue || "0", 9, "0", "right") +
+    pad(r.installment_amount || "0", 9, "0", "right") +
+    pad(r.months_in_arrears || "00", 2, "0", "right") +
+    pad(r.status_code || "", 2) +
+    pad(r.repayment_frequency || "00", 2) +
+    pad(r.terms || "0000", 4) +
+    pad(r.status_date || "00000000", 8) +
+    pad(r.old_branch_code || "", 8) +
+    pad(r.old_account_number || "", 25) +
+    pad(r.old_sub_account_number || "", 4) +
+    pad(r.old_supplier_ref || "", 10) +
+    pad(r.tel_home || "", 16) +
+    pad(r.tel_cell || "", 16) +
+    pad(r.tel_work || "", 16) +
+    pad(r.employer || "", 60) +
+    pad(r.income || "0", 9, "0", "right") +
+    pad(r.income_frequency || "", 1) +
+    pad(r.occupation || "", 20) +
+    pad(r.third_party_name || "", 60) +
+    pad(r.account_sold || "00", 2) +
+    pad(r.no_of_participants || "000", 3) +
+    pad("", 2)
+  );
+}
+
 function buildDailyLine(r, transactionDate, seenAccounts) {
   const balance = parseInt(r.current_balance || "0", 10);
+  const installment = parseInt(r.installment_amount || "0", 10);
   const isClosed = balance <= 0;
   const isNew = !seenAccounts.has(r.account_number);
-  let recordType = "D";
 
   if (isClosed) {
-    // Closure: requires status_code + status_date
-    r.status_code = determineStatusCode(r);
-    enrichFields(r);
-    recordType = "C";
+    r.status_code = "C";
   } else if (isNew) {
-    // Registration: must NOT contain status_code or status_date
-    r.status_code = "";
-    r.status_date = "00000000";
-    r.amount_overdue = "0";
-    recordType = "R";
+    r.status_code = "R";
   } else {
-    // Mid-month update: no status code
     r.status_code = "";
-    r.status_date = "00000000";
-    r.amount_overdue = "0";
-    recordType = "D"; // Unlikely used for daily but added safely
   }
 
   seenAccounts.add(r.account_number);
-  return buildDataLine(r, recordType) + pad(SUPPLIER_REF, 10, " ", "right") + pad(transactionDate, 8, "0", "right");
+
+  enrichFields(r);
+
+  return buildDataLine(r) + pad(SUPPLIER_REF, 10, " ", "right") + pad(transactionDate, 8, "0", "right");
 }
 
 function groupByAccount(records) {
@@ -173,20 +158,16 @@ function groupByAccount(records) {
   return Object.values(grouped);
 }
 
-generateFiles("sacrra_account/");
-
-async function generateFiles(tableName, type = "daily") {
+async function generate(type = "daily") {
   const today = dayjs().format("YYYYMMDD");
   const monthEnd = dayjs().endOf("month").format("YYYYMMDD");
 
-  const response = await axios.get(`${BUBBLE_API_URL}${tableName}`, {
+  const response = await axios.get(BUBBLE_API_URL, {
     headers: { Authorization: `Bearer ${BUBBLE_API_KEY}` }
   });
 
   const results = response.data.response.results;
   const seenAccounts = new Set();
-
-  console.log("res ", results);
 
   // === DAILY FILE ===
   const dailyRecords = results.map((r) => buildDailyLine(r, today, seenAccounts));
@@ -197,11 +178,11 @@ async function generateFiles(tableName, type = "daily") {
   // === MONTHLY FILE ===
   const grouped = groupByAccount(results);
   const monthly = [
-  buildHeader(monthEnd, today),
+    buildHeader(monthEnd, today),
     ...grouped.map((r) => {
       r.status_code = determineStatusCode(r);
       enrichFields(r);
-      return buildDataLine(r, "D"); // Monthly file always D
+      return buildDataLine(r);
     }),
     buildTrailer(grouped.length + 2)
   ];
@@ -211,3 +192,5 @@ async function generateFiles(tableName, type = "daily") {
 
   return [dailyFile + ".pgp", monthlyFile + ".pgp"];
 }
+
+module.exports = { generate };
