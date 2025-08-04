@@ -158,39 +158,52 @@ function groupByAccount(records) {
   return Object.values(grouped);
 }
 
-async function generate(type = "daily") {
+async function generate(tableName, type = "daily") {
   const today = dayjs().format("YYYYMMDD");
   const monthEnd = dayjs().endOf("month").format("YYYYMMDD");
 
-  const response = await axios.get(BUBBLE_API_URL, {
+  const response = await axios.get(`${BUBBLE_API_URL}${tableName}`, {
     headers: { Authorization: `Bearer ${BUBBLE_API_KEY}` }
   });
 
   const results = response.data.response.results;
   const seenAccounts = new Set();
 
+  const outputFiles = [];
+
   // === DAILY FILE ===
-  const dailyRecords = results.map((r) => buildDailyLine(r, today, seenAccounts));
-  const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${today}_1_1.txt`;
-  fs.writeFileSync(dailyFile, dailyRecords.join("\r\n"), "ascii");
-  //execSync(`./encrypt.sh ${today} D`);
+  if (type === "daily" || type === "both") {
+    const dailyRecords = results.map((r) => buildDailyLine(r, today, seenAccounts));
+    const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${today}_1_1.txt`;
+    fs.writeFileSync(dailyFile, dailyRecords.join("\r\n"), "ascii");
+
+    // GPG encryption
+    //execSync(`./encrypt.sh ${today} D`);
+    outputFiles.push(dailyFile) //+ ".pgp");
+  }
 
   // === MONTHLY FILE ===
-  const grouped = groupByAccount(results);
-  const monthly = [
-    buildHeader(monthEnd, today),
-    ...grouped.map((r) => {
-      r.status_code = determineStatusCode(r);
-      enrichFields(r);
-      return buildDataLine(r);
-    }),
-    buildTrailer(grouped.length + 2)
-  ];
-  const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
-  fs.writeFileSync(monthlyFile, monthly.join("\r\n"), "ascii");
-  //execSync(`./encrypt.sh ${monthEnd} M`);
+  if (type === "monthly" || type === "both") {
+    const grouped = groupByAccount(results);
+    const monthly = [
+      buildHeader(monthEnd, today),
+      ...grouped.map((r) => {
+        r.status_code = determineStatusCode(r);
+        enrichFields(r);
+        return buildDataLine(r);
+      }),
+      buildTrailer(grouped.length + 2)
+    ];
+    const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
+    fs.writeFileSync(monthlyFile, monthly.join("\r\n"), "ascii");
 
-  return [dailyFile + ".pgp", monthlyFile + ".pgp"];
+    // GPG encryption
+    //execSync(`./encrypt.sh ${monthEnd} M`);
+    outputFiles.push(monthlyFile) //+ ".pgp");
+  }
+
+  return outputFiles;
 }
+
 
 module.exports = { generate };

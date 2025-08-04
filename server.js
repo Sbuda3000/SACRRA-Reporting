@@ -1,27 +1,38 @@
-const express = require("express");
-const path = require("path");
-const { generate } = require("./generate");
-require("dotenv").config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const { generate } = require('./generate');
+require('dotenv').config();
 
 const app = express();
-app.use(express.json());
+const port = 3000;
 
-// 📤 Trigger File Generation
-app.post("/generate-sacrra", async (req, res) => {
+app.use(bodyParser.json());
+
+// Health check
+app.get('/', (req, res) => {
+  res.send('SACRRA Generator API is running');
+});
+
+// POST endpoint to generate file
+app.post('/generate-sacrra', async (req, res) => {
   try {
-    const type = req.body.type || "daily";
-    const files = await generate(type);
-    res.status(200).send({ message: "Files generated", files });
-  } catch (e) {
-    res.status(500).send({ error: e.message });
+    const type = req.body.type || 'daily';
+    const tableName = req.body.tableName;
+    const result = await generate(tableName, type);
+    res.status(200).send({ message: 'Files generated', files: result });
+  } catch (err) {
+    console.error('Error in /generate-sacrra:', err);
+    res.status(500).send({ error: err.message });
   }
 });
 
-// 📥 Download File (filename from query)
-app.get("/download", (req, res) => {
+// GET endpoint to download files
+app.get('/download', (req, res) => {
   const file = req.query.filename;
-  const filePath = path.join(__dirname, file);
-  res.download(filePath);
+  if (!file) return res.status(400).send('Missing filename');
+  res.download(`${__dirname}/${file}`);
 });
 
-app.listen(3000, () => console.log("SACRRA generator API running on :3000"));
+app.listen(port, () => {
+  console.log(`SACRRA Generator API running at http://localhost:${port}`);
+});
