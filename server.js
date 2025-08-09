@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { generate } = require('./generate');
+const { generate } = require('./src/generate');
 require('dotenv').config();
 
 const app = express();

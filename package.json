@@ -2,7 +2,6 @@
   "dependencies": {
     "axios": "^1.11.0",
     "dayjs": "^1.11.13",
-    "dotenv": "^17.2.1",
     "express": "^5.1.0"
   },
   "name": "saccra-export",
@@ -10,10 +9,13 @@
   "description": "",
   "main": "generate.js",
   "scripts": {
-    "start": "node generate.js"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "dotenv": "^17.2.1"
+  }
 }
