@@ -13,9 +13,6 @@ const {
   BRAND_NAME
 } = process.env;
 
-
-console.log(BUBBLE_API_KEY)
-
 // pad helper: left (default) or right
 function pad(value, length, padChar = " ", align = "left") {
   const str = (value === undefined || value === null) ? "" : value.toString();
