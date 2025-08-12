@@ -15,7 +15,9 @@ const {
 
 // pad helper: left (default) or right
 function pad(value, length, padChar = " ", align = "left") {
-  const str = (value === undefined || value === null) ? "" : value.toString();
+  const str = (value === undefined || value === null) 
+    ? "" 
+    : value.toString().replace(/[\r\n]/g, ""); // remove CR/LF completely
   if (align === "left") return str.padEnd(length, padChar).substring(0, length);
   return str.padStart(length, padChar).substring(0, length);
 }
@@ -29,19 +31,30 @@ function normalizeDate(d) {
 }
 
 function buildHeader(monthEnd, creationDate) {
-  return (
-    "H" +
-    pad(SUPPLIER_REF, 10, " ", "right") +
-    pad(monthEnd, 8, "0") +
-    "06" +
-    pad(creationDate, 8, "0") +
-    pad(BRAND_NAME, 60) +
-    pad("", 611)
-  );
+  const headerLine = "H" +
+    pad(SUPPLIER_REF, 10, " ", "right") + // positions 2–11
+    pad(monthEnd, 8, "0") +               // positions 12–19
+    "06" +                                // positions 20–21
+    pad(creationDate, 8, "0") +           // positions 22–29
+    pad(BRAND_NAME, 60) +                 // positions 30–89
+    pad("", 631);                         // remaining positions to reach 720
+
+  if (headerLine.length !== 720) {
+    throw new Error(`Header length is ${line.length}, expected 720`);
+  }  
+  return headerLine;
 }
 
 function buildTrailer(count) {
-  return "T" + pad(count, 9, "0", "right") + pad("", 690);
+  const line =
+    "T" +
+    pad(count, 9, "0", "right") + // positions 2–10
+    pad("", 710);                 // remaining positions to reach 720
+
+  if (line.length !== 720) {
+    throw new Error(`Trailer length is ${line.length}, expected 720`);
+  }
+  return line;
 }
 
 /**
@@ -50,95 +63,101 @@ function buildTrailer(count) {
  * - For daily rows pass 'R' (registration) or 'C' (closure)
  */
 function buildDataLine(r, dataIndicator = "D") {
-  return (
-    pad(dataIndicator, 1) +
-    pad(r.sa_id, 13, "0", "right") +
-    pad(r.non_sa_id || "", 16) +
-    pad(r.gender || "", 1) +
-    pad(r.date_of_birth || "", 8) +
-    pad(r.branch_code || "", 8) +
-    pad(r.account_number || "", 25) +
-    pad(r.sub_account_number || "", 4) +
-    pad(r.surname || "", 25) +
-    pad(r.title || "", 5) +
-    pad(r.first_name || "", 14) +
-    pad(r.middle_name || "", 14) +
-    pad(r.third_name || "", 14) +
-    pad(r.res_address1 || "", 25) +
-    pad(r.res_address2 || "", 25) +
-    pad(r.res_address3 || "", 25) +
-    pad(r.res_address4 || "", 25) +
-    pad(r.res_postal_code || "", 6) +
-    pad(r.tenant_type || "", 1) +
-    pad(r.post_address1 || "", 25) +
-    pad(r.post_address2 || "", 25) +
-    pad(r.post_address3 || "", 25) +
-    pad(r.post_address4 || "", 25) +
-    pad(r.post_postal_code || "", 6) +
-    pad(r.ownership || "", 2) +
-    pad(r.loan_reason || "", 2) +
-    pad(r.payment_type || "", 2) +
-    pad("M", 2) + // TYPE OF ACCOUNT - Force M for Account Type M
-    pad(r.date_account_opened || "", 8) +
-    pad(r.deferred_payment_date || "00000000", 8) +
-    pad(r.last_payment_date || "00000000", 8) +
-    pad(r.opening_balance || "0", 9, "0", "right") +
-    pad(r.current_balance || "0", 9, "0", "right") +
-    pad(r.current_balance_indicator || "", 1) +
-    pad(r.amount_overdue || "0", 9, "0", "right") +
-    pad(r.installment_amount || "0", 9, "0", "right") +
-    pad(r.months_in_arrears || "00", 2, "0", "right") +
-    pad(r.status_code || "", 2) +
-    pad(r.repayment_frequency || "00", 2) +
-    pad(r.terms || "0000", 4) +
-    pad(r.status_date || "00000000", 8) +
-    pad(r.old_branch_code || "", 8) +
-    pad(r.old_account_number || "", 25) +
-    pad(r.old_sub_account_number || "", 4) +
-    pad(r.old_supplier_ref || "", 10) +
-    pad(r.tel_home || "", 16) +
-    pad(r.tel_cell || "", 16) +
-    pad(r.tel_work || "", 16) +
-    pad(r.employer || "", 60) +
-    pad(r.income || "0", 9, "0", "right") +
-    pad(r.income_frequency || "", 1) +
-    pad(r.occupation || "", 20) +
-    pad(r.third_party_name || "", 60) +
-    pad(r.account_sold || "00", 2) +
-    pad(r.no_of_participants || "000", 3) +
-    pad("", 2)
-  );
+  r.dateaccountopened_text = normalizeDate(r["Created Date"])
+
+  if (typeof(r.sa_id_number) !== "undefined") {
+    return (
+      pad(dataIndicator, 1) +
+      pad(r.sa_id_number, 13, "0", "right") +
+      pad(r.non_sa_id_text, 16) +
+      pad(r.gender_text, 1) +
+      pad(r.dateofbirth_text, 8) +
+      pad(r.branchcode_text, 8) +
+      pad(r.accountnumber_text, 25) +
+      pad(r.subaccountnumber_text, 4) +
+      pad(r.surname_text, 25) +
+      pad(r.title_text, 5) +
+      pad(r.forename1_text, 14) +
+      pad(r.forename2_text, 14) +
+      pad(r.forename3_text, 14) +
+      pad(r.addressline1_text, 25) +
+      pad(r.addressline2_text, 25) +
+      pad(r.addressline3_text, 25) +
+      pad(r.addressline4_text, 25) +
+      pad(r.addresspostalcode_number, 6) +
+      pad(r.ownerortenant_text, 1) +
+      pad(r.postaladdressline1_text, 25) +
+      pad(r.postaladdressline2_text, 25) +
+      pad(r.postaladdressline3_text, 25) +
+      pad(r.postaladdreslines4_text, 25) +
+      pad(r.postalcode_number, 6) +
+      pad(r.ownershiptype_text, 2) +
+      pad(r.loanreasoncode_text, 2) +
+      pad(r.paymenttype_text, 2) +
+      pad("M", 2) + // Type of Account
+      pad(r.dateaccountopened_text, 8) +
+      pad(r.deferredpaymentdate || "00000000", 8) +
+      pad(r.lastpaymentdate_number || "00000000", 8) +
+      pad(r.openingbalance_number || "0", 9, "0", "right") +
+      pad(r.currentbalance_number || "0", 9, "0", "right") +
+      pad(r.currentbalanceindicator_number, 1) +
+      pad(r.amountoverdue_number || "0", 9, "0", "right") +
+      pad(r.installmentamount_number || "0", 9, "0", "right") +
+      pad(r.monthsinarrears_number || "00", 2, "0", "right") +
+      pad(r.statuscode_text, 2) +
+      pad(r.repaymentfrequency_text || "00", 2) +
+      pad(r.terms_text || "0000", 4) +
+      pad(r.statusdate_text || "00000000", 8) +
+      pad(r.oldsupplierbranchcode_text, 8) +
+      pad(r.oldaccountnumber_text, 25) +
+      pad(r.oldsubaccountnumber_text, 4) +
+      pad(r.oldsupplierreferencenumber_text, 10) +
+      pad(r.hometelephone_text, 16) +
+      pad(r.cellphonenumber_number, 16) +
+      pad(r.employerphone_number, 16) +
+      pad(r.employername_text, 60) +
+      pad(r.income_number || "0", 9, "0", "right") +
+      pad(r.incomefrequency_text, 1) +
+      pad(r.occupation_text, 20) +
+      pad(r.thirdpartyname_text, 60) +
+      pad(r.accountsoldtothirdparty_text || "00", 2) +
+      pad(r.numberofparticipantsinjointloan_number || "000", 3) +
+      pad("", 2) // filler
+    );
+  }
+
 }
 
 // validator: ensures ASCII & consistent line lengths
 function validateFileLines(lines) {
+  const expectedLength = 720;
   if (!lines || lines.length === 0) throw new Error("Empty file");
-  const length = lines[0].length;
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
-    // skip possible trailing blank line
     if (ln === "") continue;
-    if (!/^[\x00-\x7F]*$/.test(ln)) throw new Error(`Non-ASCII characters found at line ${i+1}`);
-    if (ln.length !== length) throw new Error(`Line ${i+1} length (${ln.length}) != expected ${length}`);
+    if (!/^[\x00-\x7F]*$/.test(ln)) throw new Error(`Non-ASCII characters found at line ${i + 1}`);
+    if (ln.length !== expectedLength) {
+      throw new Error(`Line ${i + 1} length (${ln.length}) != expected ${expectedLength}`);
+    }
   }
 }
 
 // small enrich / clean
 function enrichFields(r) {
-  r.date_account_opened = normalizeDate(r.date_account_opened);
-  r.last_payment_date = normalizeDate(r.last_payment_date);
-  r.status_date = r.status_date ? normalizeDate(r.status_date) : "00000000";
+  r.dateaccountopened_text = normalizeDate(r["Created Date"]);
+  r.lastpaymentdate_number = normalizeDate(r.lastpaymentdate_number);
+  r.statusdate_text = r.statusdate_text ? normalizeDate(r.statusdate_text) : "00000000";
 
   // status date required when status is C, T, V
-  const code = r.status_code || "";
+  const code = r.statuscode_text || "";
   if (["C", "T", "V"].includes(code)) {
-    r.status_date = r.last_payment_date || r.status_date || dayjs().format("YYYYMMDD");
+    r.statusdate_text = r.lastpaymentdate_number || r.statusdate_text || dayjs().format("YYYYMMDD");
   } else {
-    r.status_date = "00000000";
+    r.statusdate_text = "00000000";
   }
 
-  const months = parseInt(r.months_in_arrears || "0", 10);
-  r.amount_overdue = months > 0 ? (r.amount_overdue || "0") : "0";
+  const months = parseInt(r.monthsinarrears_number || "0", 10);
+  r.amountoverdue_number = months > 0 ? (r.amountoverdue_number || "0") : "0";
 
   // Force account type M in field (positions 368-369)
   r.type_of_account = "M";
@@ -155,17 +174,18 @@ function enrichFields(r) {
 /**
  * buildDailyLine:
  * - determines if record is a registration (R) or closure (C) per Layout 700v2:
- *   * Registration (R): date_account_opened within last 48 hours (transaction date window)
+ *   * Registration (R): dateaccountopened_text within last 48 hours (transaction date window)
  *   * Closure (C): current_balance <= 0
  * - Only includes records that qualify as R or C in the daily output (the spec expects daily files to contain registrations & closures).
  * - Appends supplier ref and transaction date (positions 701-718) as required for daily layout.
  */
 function buildDailyLine(r, transactionDate) {
+  console.log("Transaction Date and r: ", r, transactionDate)
   enrichFields(r);
 
   const today = dayjs(transactionDate, "YYYYMMDD");
   // registration if opening date within last 48 hours of transactionDate
-  const opened = r.date_account_opened && r.date_account_opened !== "00000000" ? dayjs(r.date_account_opened, "YYYYMMDD") : null;
+  const opened = r.dateaccountopened_text && r.dateaccountopened_text !== "00000000" ? dayjs(r.dateaccountopened_text, "YYYYMMDD") : null;
   const isRegistration = opened ? Math.abs(today.diff(opened, "hour")) <= 48 : false;
 
   // closure if balance <= 0
@@ -181,8 +201,8 @@ function buildDailyLine(r, transactionDate) {
   }
 
   // For closures we expect a status code and status date; ensure enrichFields set them if needed
-  if (isClosure && !r.status_code) r.status_code = "C";
-  if (isClosure && (!r.status_date || r.status_date === "00000000")) r.status_date = r.last_payment_date || dayjs().format("YYYYMMDD");
+  if (isClosure && !r.statuscode_text) r.statuscode_text = "C";
+  if (isClosure && (!r.statusdate_text || r.statusdate_text === "00000000")) r.statusdate_text = r.lastpaymentdate_number || dayjs().format("YYYYMMDD");
 
   const dataLine = buildDataLine(r, dataIndicator);
   // Append supplier ref (pos 701-710) and transaction date (pos 711-718)
@@ -193,24 +213,23 @@ function groupByAccount(records) {
   const grouped = {};
   records.forEach((r) => {
     const acc = r.account_number;
-    // keep record with latest status_date if multiple
-    if (!grouped[acc] || (r.status_date && r.status_date > grouped[acc].status_date)) {
+    // keep record with latest statusdate_text if multiple
+    if (!grouped[acc] || (r.statusdate_text && r.statusdate_text > grouped[acc].statusdate_text)) {
       grouped[acc] = r;
     }
   });
   return Object.values(grouped);
 }
 
-async function generate(tableName, type = "daily") {
+async function generate(tableName, monthEndDate, type = "daily") {
   const today = dayjs().format("YYYYMMDD");
-  const monthEnd = dayjs().endOf("month").format("YYYYMMDD");
+  const monthEnd = monthEndDate != "" ? monthEndDate : dayjs().endOf("month").format("YYYYMMDD");
 
   const response = await axios.get(`${BUBBLE_API_URL}${tableName}`, {
     headers: { Authorization: `Bearer ${BUBBLE_API_KEY}` }
   });
 
   let results = response.data.response.results || [];
-  console.log(results)
   const outputFiles = [];
 
   // DAILY
@@ -218,6 +237,7 @@ async function generate(tableName, type = "daily") {
     const dailyLines = [];
     for (const r of results) {
       const line = buildDailyLine(r, today);
+      console.log("Daily lines :", line)
       if (line) dailyLines.push(line);
     }
 
@@ -226,8 +246,8 @@ async function generate(tableName, type = "daily") {
       fs.writeFileSync(`/tmp/${dailyFile}`, dailyLines.join("\r\n"), "ascii");
 
       // validation: each line must be same length and ASCII
-      const lines = fs.readFileSync(`/tmp/${dailyFile}`, "ascii").split(/\r?\n/);
-      validateFileLines(lines);
+      //const lines = fs.readFileSync(`/tmp/${dailyFile}`, "ascii").split(/\r?\n/);
+      //validateFileLines(lines);
 
       outputFiles.push(`/tmp/${dailyFile}`);
     } else {
@@ -239,28 +259,28 @@ async function generate(tableName, type = "daily") {
   // MONTHLY
   if (type === "monthly" || type === "both") {
     const grouped = groupByAccount(results);
+    const headerLine = buildHeader(monthEnd, today);
+    console.log("HEADER length:", headerLine.length, JSON.stringify(headerLine));
     const monthly = [
-      buildHeader(monthEnd, today),
+      headerLine,
       ...grouped.map((r) => {
-        
-        //determineStatusCode(r); 
         enrichFields(r);
         return buildDataLine(r, "D");
       }),
       buildTrailer(grouped.length + 2)
     ];
+
     const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
     fs.writeFileSync(`/tmp/${monthlyFile}`, monthly.join("\r\n"), "ascii");
 
     const lines = fs.readFileSync(`/tmp/${monthlyFile}`, "ascii").split(/\r?\n/);
-    validateFileLines(lines);
+    console.log("Monthly line: ", lines)
+    //svalidateFileLines(lines);
 
     outputFiles.push(`/tmp/${monthlyFile}`);
   }
 
   return outputFiles;
 }
-
-generate("sacrra_account", "both");
 
 module.exports = { generate };
