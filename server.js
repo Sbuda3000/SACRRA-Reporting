@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
 const express = require('express');
@@ -8,13 +9,16 @@ const bodyParser = require('body-parser');
 const { generate } = require('./src/generate');
 
 const app = express();
-const port = 3000;
-
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(bodyParser.json());
 
-// Serve /tmp folder publicly so files can be downloaded via a link
-app.use("/files", express.static("/tmp"));
+const PORT = process.env.PORT || 3000;
+const EXPORTS_DIR = path.join(__dirname, "exports");
+
+// Ensure exports directory exists
+if (!fs.existsSync(EXPORTS_DIR)) {
+  fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+}
 
 // Health check
 app.get('/', (req, res) => {
@@ -28,7 +32,7 @@ app.post('/generate-sacrra', async (req, res) => {
     const tableName = req.body.tableName;
     const monthEndDate = req.body.monthEndDate;
 
-    const result = await generate(tableName, monthEndDate, type);
+    const result = await generate(tableName, monthEndDate, type, EXPORTS_DIR);
     
     res.status(200).send({ message: 'Files generated', files: result });
   } catch (err) {
@@ -68,6 +72,6 @@ app.get('/download', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`SACRRA Generator API running at http://localhost:${port}`);
+app.listen(PORT, () => {
+  console.log(`SACRRA Generator API running at http://localhost:${PORT}`);
 });

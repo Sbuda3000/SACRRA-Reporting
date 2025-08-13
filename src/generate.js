@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const fs = require("fs");
+const path = require("path");
 const axios = require("axios");
 const dayjs = require("dayjs");
 
@@ -221,7 +222,11 @@ function groupByAccount(records) {
   return Object.values(grouped);
 }
 
-async function generate(tableName, monthEndDate, type = "daily") {
+async function generate(tableName, monthEndDate, type = "daily", outputDir = "/tmp") {
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
   const today = dayjs().format("YYYYMMDD");
   const monthEnd = monthEndDate != "" ? monthEndDate : dayjs().endOf("month").format("YYYYMMDD");
 
@@ -243,13 +248,14 @@ async function generate(tableName, monthEndDate, type = "daily") {
 
     if (dailyLines.length > 0) {
       const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${today}_1_1.txt`;
-      fs.writeFileSync(`/tmp/${dailyFile}`, dailyLines.join("\r\n"), "ascii");
+      const dailyFilePath = path.join(outputDir, dailyFile);
+      fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
 
       // validation: each line must be same length and ASCII
       //const lines = fs.readFileSync(`/tmp/${dailyFile}`, "ascii").split(/\r?\n/);
       //validateFileLines(lines);
 
-      outputFiles.push(`/tmp/${dailyFile}`);
+      outputFiles.push(dailyFilePath);
     } else {
       // no daily rows to write - this is ok, return empty list (caller decides)
       console.warn("No daily registrations/closures found for date", today);
@@ -261,7 +267,7 @@ async function generate(tableName, monthEndDate, type = "daily") {
     const grouped = groupByAccount(results);
     const headerLine = buildHeader(monthEnd, today);
     console.log("HEADER length:", headerLine.length, JSON.stringify(headerLine));
-    const monthly = [
+    const monthlyLines = [
       headerLine,
       ...grouped.map((r) => {
         enrichFields(r);
@@ -271,13 +277,13 @@ async function generate(tableName, monthEndDate, type = "daily") {
     ];
 
     const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
-    fs.writeFileSync(`/tmp/${monthlyFile}`, monthly.join("\r\n"), "ascii");
+    const monthlyFilePath = path.join(outputDir, monthlyFile);
+    fs.writeFileSync(monthlyFilePath, monthlyLines.join("\r\n"), "ascii");
 
-    const lines = fs.readFileSync(`/tmp/${monthlyFile}`, "ascii").split(/\r?\n/);
-    console.log("Monthly line: ", lines)
+    //const lines = fs.readFileSync(monthlyFilePath, "ascii").split(/\r?\n/);
+    //console.log("Monthly line: ", lines)
     //svalidateFileLines(lines);
-
-    outputFiles.push(`/tmp/${monthlyFile}`);
+    outputFiles.push(monthlyFilePath);
   }
 
   return outputFiles;
