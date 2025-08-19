@@ -25,16 +25,35 @@ app.get('/', (req, res) => {
   res.send('SACRRA Generator API is running');
 });
 
+function clearExports(dir) {
+  if (fs.existsSync(dir)) {
+    for (const file of fs.readdirSync(dir)) {
+      fs.unlinkSync(path.join(dir, file));
+    }
+  }
+}
+
 // POST endpoint to generate file
 app.post('/generate-sacrra', async (req, res) => {
   try {
     const type = req.body.type || 'daily';
     const tableName = req.body.tableName;
     const monthEndDate = req.body.monthEndDate;
+    const transactionDate = req.body.transactionDate;
 
-    const result = await generate(tableName, monthEndDate, type, EXPORTS_DIR);
+    // Clear old files
+    clearExports(EXPORTS_DIR);
+
+    const result = await generate(tableName, monthEndDate, transactionDate, type, EXPORTS_DIR);
+
+    // Build downloadable URLs (use Render domain in production)
+    const files = result.map((filePath) => {
+      const fileName = path.basename(filePath);
+      const fileUrl = `${req.protocol}://${req.get("host")}/download/${encodeURIComponent(fileName)}`;
+      return { name: fileName, url: fileUrl };
+    });
     
-    res.status(200).send({ message: 'Files generated', files: result });
+    res.status(200).send({ message: 'Files generated', files });
   } catch (err) {
     console.error('Error in /generate-sacrra:', err);
     res.status(500).send({ error: err.message });
@@ -42,34 +61,19 @@ app.post('/generate-sacrra', async (req, res) => {
 });
 
 // GET endpoint to download files
-app.get('/download', async (req, res) => {
-  try {
-    const tableName = req.query.table;
-    const type = req.query.type || "both"; // daily | monthly | both
+app.get('/download/:filename', async (req, res) => {
+  const fileName = path.basename(req.params.filename);
+  const filePath = path.join(EXPORTS_DIR, fileName);
 
-    console.log(`Generating ${type} file(s) for table: ${tableName}...`);
-
-    const files = await generate(tableName, "20250831", type);
-
-    if (!files.length) {
-      return res.status(404).send("No files generated for given parameters.");
-    }
-
-    // Build public download links
-    const fileLinks = files.map((filePath) => {
-      const fileName = path.basename(filePath);
-      return `${req.protocol}://${req.get("host")}/files/${fileName}`;
-    });
-
-    res.json({
-      message: "Files generated successfully",
-      files: fileLinks
-    });
-
-  } catch (error) {
-    console.error("Error generating files:", error);
-    res.status(500).send("Error generating files");
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("File not found");
   }
+
+  res.download(filePath, fileName, (err) => {
+    if (err) {
+      console.error("Download error:", err);
+    }
+  });
 });
 
 app.listen(PORT, () => {

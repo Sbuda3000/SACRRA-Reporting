@@ -6,6 +6,9 @@ const axios = require("axios");
 const dayjs = require("dayjs");
 
 //const { determineStatusCode } = require("./helper/determineStatusCode");
+const { enrichFields } = require("./helper/enrichFields");
+const { normalizeDate } = require("./helper/normalizeDate");
+const { shouldIncludeRecord } = require("./helper/recordsToInclude");
 
 const {
   BUBBLE_API_URL,
@@ -23,14 +26,6 @@ function pad(value, length, padChar = " ", align = "left") {
   return str.padStart(length, padChar).substring(0, length);
 }
 
-function normalizeDate(d) {
-  if (!d) return "00000000";
-  const known = dayjs(d, ["YYYYMMDD", "YYYY-MM-DD", "DD/MM/YYYY"], true);
-  if (known.isValid()) return known.format("YYYYMMDD");
-  const loose = dayjs(d);
-  return loose.isValid() ? loose.format("YYYYMMDD") : "00000000";
-}
-
 function buildHeader(monthEnd, creationDate) {
   const headerLine = "H" +
     pad(SUPPLIER_REF, 10, " ", "right") + // positions 2–11
@@ -38,10 +33,10 @@ function buildHeader(monthEnd, creationDate) {
     "06" +                                // positions 20–21
     pad(creationDate, 8, "0") +           // positions 22–29
     pad(BRAND_NAME, 60) +                 // positions 30–89
-    pad("", 631);                         // remaining positions to reach 720
+    pad("", 611);                         // remaining positions to reach 700
 
-  if (headerLine.length !== 720) {
-    throw new Error(`Header length is ${line.length}, expected 720`);
+  if (headerLine.length !== 700) {
+    throw new Error(`Header length is ${headerLine.length}, expected 700`);
   }  
   return headerLine;
 }
@@ -50,10 +45,10 @@ function buildTrailer(count) {
   const line =
     "T" +
     pad(count, 9, "0", "right") + // positions 2–10
-    pad("", 710);                 // remaining positions to reach 720
+    pad("", 690);                 // remaining positions to reach 700
 
-  if (line.length !== 720) {
-    throw new Error(`Trailer length is ${line.length}, expected 720`);
+  if (line.length !== 700) {
+    throw new Error(`Trailer length is ${line.length}, expected 700`);
   }
   return line;
 }
@@ -64,170 +59,149 @@ function buildTrailer(count) {
  * - For daily rows pass 'R' (registration) or 'C' (closure)
  */
 function buildDataLine(r, dataIndicator = "D") {
-  r.dateaccountopened_text = normalizeDate(r["Created Date"])
+  r.Date_Account_Opened = normalizeDate(r["Created Date"])
 
-  if (typeof(r.sa_id_number) !== "undefined") {
+  if (typeof(r.SA_ID) !== "undefined" && r.SA_ID !== "0000000000000") {
     return (
-      pad(dataIndicator, 1) +
-      pad(r.sa_id_number, 13, "0", "right") +
-      pad(r.non_sa_id_text, 16) +
-      pad(r.gender_text, 1) +
-      pad(r.dateofbirth_text, 8) +
-      pad(r.branchcode_text, 8) +
-      pad(r.accountnumber_text, 25) +
-      pad(r.subaccountnumber_text, 4) +
-      pad(r.surname_text, 25) +
-      pad(r.title_text, 5) +
-      pad(r.forename1_text, 14) +
-      pad(r.forename2_text, 14) +
-      pad(r.forename3_text, 14) +
-      pad(r.addressline1_text, 25) +
-      pad(r.addressline2_text, 25) +
-      pad(r.addressline3_text, 25) +
-      pad(r.addressline4_text, 25) +
-      pad(r.addresspostalcode_number, 6) +
-      pad(r.ownerortenant_text, 1) +
-      pad(r.postaladdressline1_text, 25) +
-      pad(r.postaladdressline2_text, 25) +
-      pad(r.postaladdressline3_text, 25) +
-      pad(r.postaladdreslines4_text, 25) +
-      pad(r.postalcode_number, 6) +
-      pad(r.ownershiptype_text, 2) +
-      pad(r.loanreasoncode_text, 2) +
-      pad(r.paymenttype_text, 2) +
-      pad("M", 2) + // Type of Account
-      pad(r.dateaccountopened_text, 8) +
-      pad(r.deferredpaymentdate || "00000000", 8) +
-      pad(r.lastpaymentdate_number || "00000000", 8) +
-      pad(r.openingbalance_number || "0", 9, "0", "right") +
-      pad(r.currentbalance_number || "0", 9, "0", "right") +
-      pad(r.currentbalanceindicator_number, 1) +
-      pad(r.amountoverdue_number || "0", 9, "0", "right") +
-      pad(r.installmentamount_number || "0", 9, "0", "right") +
-      pad(r.monthsinarrears_number || "00", 2, "0", "right") +
-      pad(r.statuscode_text, 2) +
-      pad(r.repaymentfrequency_text || "00", 2) +
-      pad(r.terms_text || "0000", 4) +
-      pad(r.statusdate_text || "00000000", 8) +
-      pad(r.oldsupplierbranchcode_text, 8) +
-      pad(r.oldaccountnumber_text, 25) +
-      pad(r.oldsubaccountnumber_text, 4) +
-      pad(r.oldsupplierreferencenumber_text, 10) +
-      pad(r.hometelephone_text, 16) +
-      pad(r.cellphonenumber_number, 16) +
-      pad(r.employerphone_number, 16) +
-      pad(r.employername_text, 60) +
-      pad(r.income_number || "0", 9, "0", "right") +
-      pad(r.incomefrequency_text, 1) +
-      pad(r.occupation_text, 20) +
-      pad(r.thirdpartyname_text, 60) +
-      pad(r.accountsoldtothirdparty_text || "00", 2) +
-      pad(r.numberofparticipantsinjointloan_number || "000", 3) +
-      pad("", 2) // filler
+      pad(dataIndicator, 1) +                                   // 1
+      pad(r.SA_ID, 13, "0", "right") +                          // 2
+      pad(r.Non_SA_ID, 16) +                                    // 3
+      pad(r.Gender, 1) +                                        // 4
+      pad(r.Date_Of_Birth, 8) +                                 // 5
+      pad(r.Branch_Code, 8) +                                   // 6
+      pad(r.Account_Number, 25) +                               // 7
+      pad(r.Sub_Account_Number, 4) +                            // 8
+      pad(r.Surname, 25) +                                      // 9
+      pad(r.Title, 5) +                                         // 10
+      pad(r.Forename1, 14) +                                    // 11
+      pad(r.Forename2, 14) +                                    // 12
+      pad(r.Forename3, 14) +                                    // 13
+      pad(r.Address_Line1, 25) +                                // 14
+      pad(r.Address_Line2, 25) +                                // 15
+      pad(r.Address_Line3, 25) +                                // 16
+      pad(r.Address_Line4, 25) +                                // 17
+      pad(r.Address_Postal_Code, 6) +                           // 18
+      pad(r.Owner_Or_Tenant, 1) +                               // 19
+      pad(r.Postal_Address_Line1, 25) +                         // 20
+      pad(r.Postal_Address_Line2, 25) +                         // 21
+      pad(r.Postal_Address_Line3, 25) +                         // 22
+      pad(r.Postal_Address_Line4, 25) +                         // 23
+      pad(r.Postal_Code, 6) +                                   // 24
+      pad(r.Ownership_Type, 2) +                                // 25
+      pad(r.Loan_Reason_Code, 2) +                              // 26
+      pad(r.Payment_Type, 2) +                                  // 27
+      pad("M", 2) +                                             // 28
+      pad(r.Date_Account_Opened, 8) +                           // 29
+      pad(r.Deferred_Payment || "00000000", 8) +                // 30
+      pad(r.Last_Payment_Date || "00000000", 8) +               // 31
+      pad(r.Opening_Balance, 9, " ", "right") +                 // 32
+      pad(r.Current_Balance || "0", 9, "0", "right") +          // 33
+      pad(r.Current_Balance_Indicator, 1) +                     // 34
+      pad(r.Amount_Overdue || "0", 9, "0", "right") +           // 35
+      pad(r.Installment_Amount || "0", 9, "0", "right") +       // 36
+      pad(r.Months_In_Arrears || "00", 2, "0", "right") +       // 37
+      pad(r.Status_Code, 2) +                                   // 38
+      pad(r.Repayment_Frequency || "00", 2) +                   // 39
+      pad(r.Terms || "0001", 4) +                               // 40
+      pad(r.Status_Date || "00000000", 8) +                     // 41
+      pad(r.Old_Supplier_Branch_Code, 8) +                      // 42
+      pad(r.Account_Number, 25) +                               // 43
+      pad(r.Account_Number, 4) +                                // 44
+      pad(r.Old_Supplier_Reference_Number, 10) +                // 45
+      pad(r.Home_Telephone ? "0" + r.Home_Telephone : "", 16) + // 46
+      pad(r.Cellphone ? "0" + r.Cellphone : "", 16) +           // 47
+      pad(r.Employer_Phone ? "0" + r.Employer_Phone : "", 16) + // 48
+      pad(r.Employer_Name, 60) +                                // 49
+      pad(r.Income, 9, " ", "right") +                          // 50
+      pad(r.Income_Frequency, 1) +                              // 51
+      pad(r.Occupation, 20) +                                   // 52
+      pad(r.Third_Party_Name, 60) +                             // 53
+      pad(r.Account_Sold_To_Third_Party || "00", 2) +           // 54
+      pad(r.Number_Of_Participants_In_Joint_Loan, 3) +          // 56
+      pad("", 2)                                                // filler
     );
   }
-
+  else {
+    return null;
+  }
 }
 
 // validator: ensures ASCII & consistent line lengths
-function validateFileLines(lines) {
-  const expectedLength = 720;
+function validateFileLines(lines, type) {
+  const monthlyExpectedLength = 700;
+  const dailyExpectedLength = 718;
+
   if (!lines || lines.length === 0) throw new Error("Empty file");
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
     if (ln === "") continue;
     if (!/^[\x00-\x7F]*$/.test(ln)) throw new Error(`Non-ASCII characters found at line ${i + 1}`);
-    if (ln.length !== expectedLength) {
-      throw new Error(`Line ${i + 1} length (${ln.length}) != expected ${expectedLength}`);
+    if (type == "monthly") {
+      if (ln.length !== monthlyExpectedLength) {
+        throw new Error(`Line ${i + 1} length (${ln.length}) != expected ${monthlyExpectedLength}`);
+      }
+    }
+    else {
+      if (ln.length !== dailyExpectedLength) {
+        throw new Error(`Line ${i + 1} length (${ln.length}) != expected ${dailyExpectedLength}`);
+      }
     }
   }
-}
-
-// small enrich / clean
-function enrichFields(r) {
-  r.dateaccountopened_text = normalizeDate(r["Created Date"]);
-  r.lastpaymentdate_number = normalizeDate(r.lastpaymentdate_number);
-  r.statusdate_text = r.statusdate_text ? normalizeDate(r.statusdate_text) : "00000000";
-
-  // status date required when status is C, T, V
-  const code = r.statuscode_text || "";
-  if (["C", "T", "V"].includes(code)) {
-    r.statusdate_text = r.lastpaymentdate_number || r.statusdate_text || dayjs().format("YYYYMMDD");
-  } else {
-    r.statusdate_text = "00000000";
-  }
-
-  const months = parseInt(r.monthsinarrears_number || "0", 10);
-  r.amountoverdue_number = months > 0 ? (r.amountoverdue_number || "0") : "0";
-
-  // Force account type M in field (positions 368-369)
-  r.type_of_account = "M";
-
-  // sanitize strings
-  for (const k of Object.keys(r)) {
-    if (typeof r[k] === "string") {
-      r[k] = r[k].replace(/\r?\n/g, " ").replace(/\|/g, "").trim();
-    }
-  }
-  return r;
 }
 
 /**
  * buildDailyLine:
  * - determines if record is a registration (R) or closure (C) per Layout 700v2:
  *   * Registration (R): dateaccountopened_text within last 48 hours (transaction date window)
- *   * Closure (C): current_balance <= 0
+ *   * Closure (C): Current_Balance_number <= 0
  * - Only includes records that qualify as R or C in the daily output (the spec expects daily files to contain registrations & closures).
  * - Appends supplier ref and transaction date (positions 701-718) as required for daily layout.
  */
-function buildDailyLine(r, transactionDate) {
-  console.log("Transaction Date and r: ", r, transactionDate)
+function buildDailyLine(r, transactionDate, monthEnd) {
+  r.Months_In_Arrears = "  "; // No months in arrears for daily files
   enrichFields(r);
 
-  const today = dayjs(transactionDate, "YYYYMMDD");
-  // registration if opening date within last 48 hours of transactionDate
-  const opened = r.dateaccountopened_text && r.dateaccountopened_text !== "00000000" ? dayjs(r.dateaccountopened_text, "YYYYMMDD") : null;
-  const isRegistration = opened ? Math.abs(today.diff(opened, "hour")) <= 48 : false;
+  const { include, type } = shouldIncludeRecord(r, transactionDate, monthEnd, true);
+  if (!include) return null; // skip records that don't qualify
 
-  // closure if balance <= 0
-  const balance = parseInt(r.current_balance || "0", 10);
-  const isClosure = balance <= 0;
-
-  let dataIndicator = "";
-  if (isRegistration) dataIndicator = "R";
-  else if (isClosure) dataIndicator = "C";
-  else {
-    // per layout: daily files are for registrations and closures; skip other records
-    return null;
+  if (type === "C" && !r.Status_Code) r.Status_Code = "C";
+  if (type === "C" && (!r.Status_Date || r.Status_Date === "00000000")) {
+    r.Status_Date = r.Last_Payment_Date || transactionDate;
   }
-
-  // For closures we expect a status code and status date; ensure enrichFields set them if needed
-  if (isClosure && !r.statuscode_text) r.statuscode_text = "C";
-  if (isClosure && (!r.statusdate_text || r.statusdate_text === "00000000")) r.statusdate_text = r.lastpaymentdate_number || dayjs().format("YYYYMMDD");
-
-  const dataLine = buildDataLine(r, dataIndicator);
-  // Append supplier ref (pos 701-710) and transaction date (pos 711-718)
-  return dataLine + pad(SUPPLIER_REF, 10, " ", "right") + pad(transactionDate, 8, "0", "right");
+  
+  const dataLine = buildDataLine(r, type);
+  if (dataLine) {
+    // Append supplier ref (pos 701-710) and transaction date (pos 711-718)
+    return dataLine + pad(SUPPLIER_REF, 10, " ", "right") + pad(transactionDate, 8, "0", "right");
+  }
+  else {
+    return null; // skip if no data line was built
+  }
 }
 
-function groupByAccount(records) {
+function groupByAccountMonthly(records, monthEnd, today) {
   const grouped = {};
   records.forEach((r) => {
-    const acc = r.account_number;
-    // keep record with latest statusdate_text if multiple
-    if (!grouped[acc] || (r.statusdate_text && r.statusdate_text > grouped[acc].statusdate_text)) {
+    const { include } = shouldIncludeRecord(r, today, monthEnd, false);
+    if (!include) return;
+
+    const acc = r.Account_Number;
+    const statusDate = r.Status_Date ? dayjs(r.Status_Date, "YYYYMMDD") : null;
+
+    if (!grouped[acc] || (statusDate && statusDate.isAfter(dayjs(grouped[acc].Status_Date, "YYYYMMDD")))) {
       grouped[acc] = r;
     }
   });
   return Object.values(grouped);
 }
 
-async function generate(tableName, monthEndDate, type = "daily", outputDir = "/tmp") {
+async function generate(tableName, monthEndDate, transactionDate, type = "daily", outputDir = "/tmp") {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
   const today = dayjs().format("YYYYMMDD");
+  const transactDate = transactionDate ? transactionDate : today;
   const monthEnd = monthEndDate != "" ? monthEndDate : dayjs().endOf("month").format("YYYYMMDD");
 
   const response = await axios.get(`${BUBBLE_API_URL}${tableName}`, {
@@ -241,48 +215,46 @@ async function generate(tableName, monthEndDate, type = "daily", outputDir = "/t
   if (type === "daily" || type === "both") {
     const dailyLines = [];
     for (const r of results) {
-      const line = buildDailyLine(r, today);
-      console.log("Daily lines :", line)
-      if (line) dailyLines.push(line);
+      const dailyLine = buildDailyLine(r, transactDate);
+      if (dailyLine !== null) dailyLines.push(dailyLine);
     }
 
     if (dailyLines.length > 0) {
-      const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${today}_1_1.txt`;
+      const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
       const dailyFilePath = path.join(outputDir, dailyFile);
-      fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
 
       // validation: each line must be same length and ASCII
-      //const lines = fs.readFileSync(`/tmp/${dailyFile}`, "ascii").split(/\r?\n/);
-      //validateFileLines(lines);
+      validateFileLines(dailyLines, "daily");
+
+      fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
 
       outputFiles.push(dailyFilePath);
     } else {
       // no daily rows to write - this is ok, return empty list (caller decides)
-      console.warn("No daily registrations/closures found for date", today);
+      console.warn("No daily registrations/closures found for date", transactDate);
     }
   }
 
   // MONTHLY
   if (type === "monthly" || type === "both") {
-    const grouped = groupByAccount(results);
+    const grouped = groupByAccountMonthly(results, monthEnd, today);
     const headerLine = buildHeader(monthEnd, today);
-    console.log("HEADER length:", headerLine.length, JSON.stringify(headerLine));
+
     const monthlyLines = [
       headerLine,
       ...grouped.map((r) => {
         enrichFields(r);
-        return buildDataLine(r, "D");
+        return buildDataLine(r, "D"); // always "D" for monthly
       }),
       buildTrailer(grouped.length + 2)
     ];
 
     const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
     const monthlyFilePath = path.join(outputDir, monthlyFile);
-    fs.writeFileSync(monthlyFilePath, monthlyLines.join("\r\n"), "ascii");
 
-    //const lines = fs.readFileSync(monthlyFilePath, "ascii").split(/\r?\n/);
-    //console.log("Monthly line: ", lines)
-    //svalidateFileLines(lines);
+    validateFileLines(monthlyLines, "monthly");
+
+    fs.writeFileSync(monthlyFilePath, monthlyLines.join("\r\n"), "ascii");
     outputFiles.push(monthlyFilePath);
   }
 
