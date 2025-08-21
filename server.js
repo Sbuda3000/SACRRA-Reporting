@@ -49,7 +49,7 @@ app.post('/generate-sacrra', async (req, res) => {
     // Build downloadable URLs (use Render domain in production)
     const files = result.map((filePath) => {
       const fileName = path.basename(filePath);
-      const fileUrl = `${req.protocol}://${req.get("host")}/download/${encodeURIComponent(fileName)}`;
+      const fileUrl = `https://${req.get("host")}/download/${encodeURIComponent(fileName)}`;
       return { name: fileName, url: fileUrl };
     });
     
