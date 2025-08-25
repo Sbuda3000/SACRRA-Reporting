@@ -12,7 +12,7 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 const EXPORTS_DIR = path.join(__dirname, "exports");
 
 // Ensure exports directory exists

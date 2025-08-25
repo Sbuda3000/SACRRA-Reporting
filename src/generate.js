@@ -6,9 +6,12 @@ const axios = require("axios");
 const dayjs = require("dayjs");
 
 //const { determineStatusCode } = require("./helper/determineStatusCode");
+const { encryptFile } = require("./helper/encryptFile");
 const { enrichFields } = require("./helper/enrichFields");
 const { normalizeDate } = require("./helper/normalizeDate");
 const { shouldIncludeRecord } = require("./helper/recordsToInclude");
+
+const publicKeyArmored = process.env.SACRRA_PUBLIC_KEY.replace(/\\n/g, "\n"); 
 
 const {
   BUBBLE_API_URL,
@@ -225,10 +228,12 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
 
       // validation: each line must be same length and ASCII
       validateFileLines(dailyLines, "daily");
-
+      
       fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
-
+      const dailyEncrypted = await encryptFile(dailyFilePath, publicKeyArmored);
+      
       outputFiles.push(dailyFilePath);
+      outputFiles.push(dailyEncrypted);
     } else {
       // no daily rows to write - this is ok, return empty list (caller decides)
       console.warn("No daily registrations/closures found for date", transactDate);
@@ -255,7 +260,10 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     validateFileLines(monthlyLines, "monthly");
 
     fs.writeFileSync(monthlyFilePath, monthlyLines.join("\r\n"), "ascii");
+    const monthlyFileEncrypted = await encryptFile(monthlyFilePath, publicKeyArmored);
+
     outputFiles.push(monthlyFilePath);
+    outputFiles.push(monthlyFileEncrypted);
   }
 
   return outputFiles;
