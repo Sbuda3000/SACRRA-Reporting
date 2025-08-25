@@ -214,8 +214,15 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
 
   let results = response.data.response.results || [];
   const outputFiles = [];
-  let dailyFile = "";
   let monthlyFile = "";
+
+  const zipName = `SACRRA_${type}_${today}.zip`;
+  const zipPath = path.join(EXPORTS_DIR, zipName);
+
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  archive.pipe(output);
 
   // DAILY
   if (type === "daily" || type === "both") {
@@ -226,7 +233,7 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     }
 
     if (dailyLines.length > 0) {
-      dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
+      const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
       const dailyFilePath = path.join(EXPORTS_DIR, dailyFile);
 
       // validation: each line must be same length and ASCII
@@ -235,11 +242,13 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
       fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
       const dailyEncrypted = await encryptFile(dailyFilePath, publicKeyArmored);
       
-      outputFiles.push(dailyFilePath);
-      outputFiles.push(dailyEncrypted);
+      archive.file(dailyFilePath, { name: dailyFile });
+      archive.file(dailyEncrypted, { name: dailyFile + ".pgp" });
+      
     } else {
       // no daily rows to write - this is ok, return empty list (caller decides)
       console.warn("No daily registrations/closures found for date", transactDate);
+      return [];
     }
   }
 
@@ -265,31 +274,12 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     fs.writeFileSync(monthlyFilePath, monthlyLines.join("\r\n"), "ascii");
     const monthlyFileEncrypted = await encryptFile(monthlyFilePath, publicKeyArmored);
 
-    outputFiles.push(monthlyFilePath);
-    outputFiles.push(monthlyFileEncrypted);
-  }
-
-  // === ZIP BOTH FILES ===
-  const zipName = `SACRRA_${type}_${today}.zip`;
-  const zipPath = path.join(EXPORTS_DIR, zipName);
-
-  const output = fs.createWriteStream(zipPath);
-  const archive = archiver("zip", { zlib: { level: 9 } });
-
-  archive.pipe(output);
-
-  if (dailyFile) {
-    archive.file(path.join(EXPORTS_DIR, dailyFile), { name: dailyFile });
-    archive.file(path.join(EXPORTS_DIR, dailyFile + ".pgp"), { name: dailyFile + ".pgp" });
-  }
-  if (monthlyFile) {
-    archive.file(path.join(EXPORTS_DIR, monthlyFile), { name: monthlyFile });
-    archive.file(path.join(EXPORTS_DIR, monthlyFile + ".pgp"), { name: monthlyFile + ".pgp" });
-  }
+    archive.file(monthlyFilePath, { name: monthlyFile });
+    archive.file(monthlyFileEncrypted, { name: monthlyFile + ".pgp" });
+  }  
 
   await archive.finalize();
 
-  //return outputFiles;
   return [zipPath];
 }
 
