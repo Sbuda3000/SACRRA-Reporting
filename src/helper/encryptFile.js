@@ -4,9 +4,8 @@ const fs = require("fs");
 async function encryptFile(filePath, publicKeyArmored) {
   // Read your plaintext file
   const data = fs.readFileSync(filePath, "utf8");
-  console.log("Data ", data);
 
-  // Load the public key (you’ll store this as env variable in Render)
+  // Load the public key
   const publicKey = await openpgp.readKey({ armoredKey: publicKeyArmored });
 
   // Encrypt

@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const dayjs = require("dayjs");
+const archiver = require("archiver");
 
 //const { determineStatusCode } = require("./helper/determineStatusCode");
 const { encryptFile } = require("./helper/encryptFile");
@@ -198,9 +199,9 @@ function groupByAccountMonthly(records, monthEnd, today) {
   return Object.values(grouped);
 }
 
-async function generate(tableName, monthEndDate, transactionDate, type = "daily", outputDir = "/tmp") {
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+async function generate(tableName, monthEndDate, transactionDate, type = "daily", EXPORTS_DIR) {
+  if (!fs.existsSync(EXPORTS_DIR)) {
+    fs.mkdirSync(EXPORTS_DIR, { recursive: true });
   }
 
   const today = dayjs().format("YYYYMMDD");
@@ -213,6 +214,8 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
 
   let results = response.data.response.results || [];
   const outputFiles = [];
+  let dailyFile = "";
+  let monthlyFile = "";
 
   // DAILY
   if (type === "daily" || type === "both") {
@@ -223,8 +226,8 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     }
 
     if (dailyLines.length > 0) {
-      const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
-      const dailyFilePath = path.join(outputDir, dailyFile);
+      dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
+      const dailyFilePath = path.join(EXPORTS_DIR, dailyFile);
 
       // validation: each line must be same length and ASCII
       validateFileLines(dailyLines, "daily");
@@ -254,8 +257,8 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
       buildTrailer(grouped.length + 2)
     ];
 
-    const monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
-    const monthlyFilePath = path.join(outputDir, monthlyFile);
+    monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
+    const monthlyFilePath = path.join(EXPORTS_DIR, monthlyFile);
 
     validateFileLines(monthlyLines, "monthly");
 
@@ -266,7 +269,28 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     outputFiles.push(monthlyFileEncrypted);
   }
 
-  return outputFiles;
+  // === ZIP BOTH FILES ===
+  const zipName = `SACRRA_${type}_${today}.zip`;
+  const zipPath = path.join(EXPORTS_DIR, zipName);
+
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  archive.pipe(output);
+
+  if (dailyFile) {
+    archive.file(path.join(EXPORTS_DIR, dailyFile), { name: dailyFile });
+    archive.file(path.join(EXPORTS_DIR, dailyFile + ".pgp"), { name: dailyFile + ".pgp" });
+  }
+  if (monthlyFile) {
+    archive.file(path.join(EXPORTS_DIR, monthlyFile), { name: monthlyFile });
+    archive.file(path.join(EXPORTS_DIR, monthlyFile + ".pgp"), { name: monthlyFile + ".pgp" });
+  }
+
+  await archive.finalize();
+
+  //return outputFiles;
+  return [zipPath];
 }
 
 module.exports = { generate };
