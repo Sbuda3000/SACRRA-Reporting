@@ -233,7 +233,7 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
     }
 
     if (dailyLines.length > 0) {
-      const dailyFile = `${SUPPLIER_REF}_ALL_L702_D_${transactDate}_1_1.txt`;
+      const dailyFile = `${SUPPLIER_REF}_ALL_T702_D_${transactDate}_1_1.txt`;
       const dailyFilePath = path.join(EXPORTS_DIR, dailyFile);
 
       // validation: each line must be same length and ASCII
@@ -266,7 +266,7 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
       buildTrailer(grouped.length + 2)
     ];
 
-    monthlyFile = `${SUPPLIER_REF}_ALL_L702_M_${monthEnd}_1_1.txt`;
+    monthlyFile = `${SUPPLIER_REF}_ALL_T702_M_${monthEnd}_1_1.txt`;
     const monthlyFilePath = path.join(EXPORTS_DIR, monthlyFile);
 
     validateFileLines(monthlyLines, "monthly");
