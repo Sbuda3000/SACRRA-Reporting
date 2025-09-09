@@ -239,7 +239,7 @@ async function generate(tableName, monthEndDate, transactionDate, type = "daily"
       // validation: each line must be same length and ASCII
       validateFileLines(dailyLines, "daily");
       
-      fs.writeFileSync(dailyFilePath, dailyLines.join("\r\n"), "ascii");
+      fs.writeFileSync(dailyFilePath, dailyLines.concat("").join("\r\n"), "ascii");
       const dailyEncrypted = await encryptFile(dailyFilePath, publicKeyArmored);
       
       archive.file(dailyFilePath, { name: dailyFile });
